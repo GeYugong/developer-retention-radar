@@ -1,0 +1,4 @@
+:root { font-family: Inter, "Microsoft YaHei", sans-serif; color: #10233f; background: #f4f7fb; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1200px; margin: 0 auto; padding: 48px 24px; }
