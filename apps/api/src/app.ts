@@ -9,6 +9,7 @@ import { requireAdmin, signToken } from './auth.js';
 import { config } from './config.js';
 import { query } from './db.js';
 import { buildFunnel, normalizeIdentity, percentage } from './domain.js';
+import { resetDemoData } from './seed.js';
 
 export const app = express();
 app.use(helmet({ crossOriginResourcePolicy: false }));
@@ -75,5 +76,6 @@ app.get('/api/campaigns/:id/participants', requireAdmin, asyncRoute(async (req,r
   const r=await query<any>(`SELECT p.*,coalesce(json_agg(json_build_object('stageId',s.id,'stageName',s.name,'checkedAt',c.created_at)) FILTER(WHERE c.id IS NOT NULL),'[]') checkins FROM participants p LEFT JOIN checkins c ON c.participant_id=p.id LEFT JOIN stages s ON s.id=c.stage_id WHERE p.campaign_id=$1${filter} GROUP BY p.id ORDER BY p.created_at DESC`,params); res.json(r.rows);
 }));
 app.get('/api/campaigns/:id/export.csv', requireAdmin, asyncRoute(async (req,res)=>{ const r=await query<any>('SELECT name,student_id,phone,school,created_at FROM participants WHERE campaign_id=$1 ORDER BY created_at',[req.params.id]); const esc=(v:unknown)=>`"${String(v??'').replaceAll('"','""')}"`; const csv='\uFEFF姓名,学号,手机号,学校,报名时间\n'+r.rows.map(x=>[x.name,x.student_id,x.phone,x.school,x.created_at.toISOString()].map(esc).join(',')).join('\n'); res.type('text/csv').attachment('participants.csv').send(csv); }));
+app.post('/api/demo/reset', requireAdmin, asyncRoute(async (req,res)=>{ if(req.body?.confirm!=='RESET')return void res.status(400).json({error:'需要确认重置操作'});res.json(await resetDemoData()); }));
 
 app.use((err:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{ if(err instanceof z.ZodError)return void res.status(400).json({error:'提交信息不完整或格式不正确',details:err.issues}); if(err?.code==='23505')return void res.status(409).json({error:'数据与现有记录冲突'}); console.error(err); res.status(500).json({error:'服务器暂时无法处理请求'}); });
