@@ -29,7 +29,13 @@ app.post('/api/auth/login', asyncRoute(async (req, res) => {
   const storedHash = process.env.ADMIN_PASSWORD_HASH;
   const validPassword = storedHash ? await bcrypt.compare(body.password, storedHash) : body.password === config.ADMIN_PASSWORD;
   if (body.username !== config.ADMIN_USERNAME || !validPassword) return void res.status(401).json({ error: '用户名或密码错误' });
-  res.cookie('radar_token', signToken(body.username), { httpOnly: true, sameSite: 'lax', secure: config.NODE_ENV === 'production', maxAge: 8 * 3600_000 }).json({ username: body.username });
+  res.cookie('radar_token', signToken(body.username), {
+    httpOnly: true,
+    sameSite: 'lax',
+    // Secure cookies are not sent over an HTTP-only public IP address.
+    secure: config.NODE_ENV === 'production' && config.PUBLIC_URL.startsWith('https://'),
+    maxAge: 8 * 3600_000
+  }).json({ username: body.username });
 }));
 app.post('/api/auth/logout', (_req, res) => res.clearCookie('radar_token').status(204).end());
 app.get('/api/auth/me', requireAdmin, (req, res) => res.json({ username: (req as any).admin }));
