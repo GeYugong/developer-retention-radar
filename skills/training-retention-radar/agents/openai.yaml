@@ -1,0 +1,4 @@
+interface:
+  display_name: "Training Retention Radar"
+  short_description: "Deploy and verify training-camp retention funnels"
+  default_prompt: "Deploy or verify the training retention radar application."
