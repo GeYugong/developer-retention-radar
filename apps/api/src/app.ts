@@ -12,6 +12,8 @@ import { buildFunnel, normalizeIdentity, percentage } from './domain.js';
 import { resetDemoData } from './seed.js';
 
 export const app = express();
+// Nginx is the single reverse proxy in production and sets X-Forwarded-For.
+app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({ origin: config.PUBLIC_URL, credentials: true }));
 app.use(express.json({ limit: '100kb' }));
@@ -55,7 +57,13 @@ app.patch('/api/campaigns/:id', requireAdmin, asyncRoute(async (req, res) => {
   const v = {...current.rows[0],...b};
   const result = await query('UPDATE campaigns SET name=$2,description=$3,status=$4,updated_at=now() WHERE id=$1 RETURNING *',[req.params.id,v.name,v.description,v.status]); res.json(result.rows[0]);
 }));
-app.delete('/api/campaigns/:id', requireAdmin, asyncRoute(async (req,res)=>{ await query('DELETE FROM campaigns WHERE id=$1',[req.params.id]); res.status(204).end(); }));
+app.delete('/api/campaigns/:id', requireAdmin, asyncRoute(async (req,res)=>{
+  // checkins reference stages without a database-level cascade, so remove the
+  // dependent audit rows before removing the campaign and its stages.
+  await query('DELETE FROM checkins WHERE stage_id IN (SELECT id FROM stages WHERE campaign_id=$1)', [req.params.id]);
+  await query('DELETE FROM campaigns WHERE id=$1',[req.params.id]);
+  res.status(204).end();
+}));
 
 app.get('/api/campaigns/:id/stages', requireAdmin, asyncRoute(async (req,res)=>{ const r=await query('SELECT * FROM stages WHERE campaign_id=$1 AND deleted_at IS NULL ORDER BY position',[req.params.id]); res.json(r.rows); }));
 app.post('/api/campaigns/:id/stages', requireAdmin, asyncRoute(async (req,res)=>{ const b=stageSchema.parse(req.body); const r=await query('INSERT INTO stages(campaign_id,name,description,kind,position) VALUES($1,$2,$3,$4,$5) RETURNING *',[req.params.id,b.name,b.description,b.kind,b.position]); res.status(201).json(r.rows[0]); }));
