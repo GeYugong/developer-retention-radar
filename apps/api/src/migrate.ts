@@ -21,8 +21,10 @@ CREATE TABLE IF NOT EXISTS participants (
 CREATE TABLE IF NOT EXISTS checkins (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), stage_id uuid NOT NULL REFERENCES stages(id),
   participant_id uuid NOT NULL REFERENCES participants(id), source text NOT NULL DEFAULT 'web',
-  device text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(stage_id, participant_id)
+  device text NOT NULL DEFAULT '', submission_url text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(stage_id, participant_id)
 );
+ALTER TABLE checkins ADD COLUMN IF NOT EXISTS submission_url text NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_stages_campaign ON stages(campaign_id, position) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_checkins_stage ON checkins(stage_id);
 `;

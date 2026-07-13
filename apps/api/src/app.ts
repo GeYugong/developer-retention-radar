@@ -24,7 +24,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 const asyncRoute = (fn: express.RequestHandler): express.RequestHandler => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const campaignSchema = z.object({ name: z.string().trim().min(2).max(80), description: z.string().max(500).default(''), status: z.enum(['draft','active','closed']).default('draft') });
 const stageSchema = z.object({ name: z.string().trim().min(2).max(50), description: z.string().max(300).default(''), kind: z.enum(['registration','checkin','submission']).default('checkin'), position: z.number().int().positive() });
-const participantSchema = z.object({ name: z.string().trim().min(2).max(40), studentId: z.string().trim().min(3).max(40), phone: z.string().trim().regex(/^1?\d{6,14}$/), school: z.string().trim().max(80).default('') });
+const participantSchema = z.object({ name: z.string().trim().min(2).max(40), studentId: z.string().trim().min(3).max(40), phone: z.string().trim().regex(/^1?\d{6,14}$/), school: z.string().trim().max(80).default(''), submissionUrl: z.string().trim().url('作品链接格式不正确').max(500).optional().or(z.literal('')) });
 
 app.post('/api/auth/login', asyncRoute(async (req, res) => {
   const body = z.object({ username: z.string(), password: z.string() }).parse(req.body);
@@ -77,7 +77,8 @@ app.post('/api/public/stages/:id/checkin', asyncRoute(async (req,res)=>{
   const s=stage.rows[0]; let participant;
   if(s.kind==='registration') { const r=await query<any>(`INSERT INTO participants(campaign_id,name,student_id,phone,school) VALUES($1,$2,$3,$4,$5) ON CONFLICT(campaign_id,student_id) DO UPDATE SET name=EXCLUDED.name,phone=EXCLUDED.phone,school=EXCLUDED.school RETURNING *`,[s.campaign_id,b.name,normalizeIdentity(b.studentId),normalizeIdentity(b.phone),b.school]); participant=r.rows[0]; }
   else { const r=await query<any>('SELECT * FROM participants WHERE campaign_id=$1 AND (student_id=$2 OR phone=$3)',[s.campaign_id,normalizeIdentity(b.studentId),normalizeIdentity(b.phone)]); if(!r.rowCount)return void res.status(404).json({error:'未找到报名信息，请先完成报名'}); participant=r.rows[0]; }
-  const result=await query<any>('INSERT INTO checkins(stage_id,participant_id,source,device) VALUES($1,$2,$3,$4) ON CONFLICT(stage_id,participant_id) DO NOTHING RETURNING id,created_at',[s.id,participant.id,'web',String(req.headers['user-agent']??'').slice(0,200)]);
+  if(s.kind==='submission'&&!b.submissionUrl)return void res.status(400).json({error:'请填写作品提交链接'});
+  const result=await query<any>('INSERT INTO checkins(stage_id,participant_id,source,device,submission_url) VALUES($1,$2,$3,$4,$5) ON CONFLICT(stage_id,participant_id) DO NOTHING RETURNING id,created_at,submission_url',[s.id,participant.id,'web',String(req.headers['user-agent']??'').slice(0,200),b.submissionUrl??'']);
   res.json({success:true,duplicate:result.rowCount===0,participant:{name:participant.name},checkedAt:result.rows[0]?.created_at});
 }));
 
@@ -86,10 +87,13 @@ app.get('/api/campaigns/:id/analytics', requireAdmin, asyncRoute(async (req,res)
   const funnel=buildFunnel(r.rows); res.json({funnel,overallRate:funnel.length?percentage(funnel.at(-1)!.count,funnel[0].count):0});
 }));
 app.get('/api/campaigns/:id/participants', requireAdmin, asyncRoute(async (req,res)=>{
-  const params:any[]=[req.params.id]; let filter=''; if(req.query.stageId){params.push(req.query.stageId);filter=` AND EXISTS(SELECT 1 FROM checkins x WHERE x.participant_id=p.id AND x.stage_id=$${params.length})`;}
-  const r=await query<any>(`SELECT p.*,coalesce(json_agg(json_build_object('stageId',s.id,'stageName',s.name,'checkedAt',c.created_at)) FILTER(WHERE c.id IS NOT NULL),'[]') checkins FROM participants p LEFT JOIN checkins c ON c.participant_id=p.id LEFT JOIN stages s ON s.id=c.stage_id WHERE p.campaign_id=$1${filter} GROUP BY p.id ORDER BY p.created_at DESC`,params); res.json(r.rows);
+  const params:any[]=[req.params.id]; const filters:string[]=[];
+  if(req.query.stageId){params.push(req.query.stageId);filters.push(`EXISTS(SELECT 1 FROM checkins x WHERE x.participant_id=p.id AND x.stage_id=$${params.length})`);}
+  if(req.query.q){params.push(`%${String(req.query.q).trim()}%`);filters.push(`(p.name ILIKE $${params.length} OR p.student_id ILIKE $${params.length} OR p.phone ILIKE $${params.length})`);}
+  const where=filters.length?` AND ${filters.join(' AND ')}`:'';
+  const r=await query<any>(`SELECT p.*,coalesce(json_agg(json_build_object('stageId',s.id,'stageName',s.name,'checkedAt',c.created_at,'submissionUrl',c.submission_url)) FILTER(WHERE c.id IS NOT NULL),'[]') checkins FROM participants p LEFT JOIN checkins c ON c.participant_id=p.id LEFT JOIN stages s ON s.id=c.stage_id WHERE p.campaign_id=$1${where} GROUP BY p.id ORDER BY p.created_at DESC`,params); res.json(r.rows);
 }));
-app.get('/api/campaigns/:id/export.csv', requireAdmin, asyncRoute(async (req,res)=>{ const r=await query<any>('SELECT name,student_id,phone,school,created_at FROM participants WHERE campaign_id=$1 ORDER BY created_at',[req.params.id]); const esc=(v:unknown)=>`"${String(v??'').replaceAll('"','""')}"`; const csv='\uFEFF姓名,学号,手机号,学校,报名时间\n'+r.rows.map(x=>[x.name,x.student_id,x.phone,x.school,x.created_at.toISOString()].map(esc).join(',')).join('\n'); res.type('text/csv').attachment('participants.csv').send(csv); }));
+app.get('/api/campaigns/:id/export.csv', requireAdmin, asyncRoute(async (req,res)=>{ const r=await query<any>(`SELECT p.name,p.student_id,p.phone,p.school,p.created_at,max(c.submission_url) FILTER (WHERE c.submission_url <> '') submission_url FROM participants p LEFT JOIN checkins c ON c.participant_id=p.id WHERE p.campaign_id=$1 GROUP BY p.id ORDER BY p.created_at`,[req.params.id]); const esc=(v:unknown)=>`"${String(v??'').replaceAll('"','""')}"`; const csv='\uFEFF姓名,学号,手机号,学校,报名时间,作品链接\n'+r.rows.map(x=>[x.name,x.student_id,x.phone,x.school,x.created_at.toISOString(),x.submission_url].map(esc).join(',')).join('\n'); res.type('text/csv').attachment('participants.csv').send(csv); }));
 app.post('/api/demo/reset', requireAdmin, asyncRoute(async (req,res)=>{ if(req.body?.confirm!=='RESET')return void res.status(400).json({error:'需要确认重置操作'});res.json(await resetDemoData()); }));
 
 app.use((err:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{ if(err instanceof z.ZodError)return void res.status(400).json({error:'提交信息不完整或格式不正确',details:err.issues}); if(err?.code==='23505')return void res.status(409).json({error:'数据与现有记录冲突'}); console.error(err); res.status(500).json({error:'服务器暂时无法处理请求'}); });
