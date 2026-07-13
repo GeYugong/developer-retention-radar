@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import { z } from 'zod';
 import { requireAdmin, signToken } from './auth.js';
 import { config } from './config.js';
-import { query } from './db.js';
+import { pool, query } from './db.js';
 import { buildFunnel, normalizeIdentity, percentage } from './domain.js';
 import { resetDemoData } from './seed.js';
 
@@ -24,6 +24,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 const asyncRoute = (fn: express.RequestHandler): express.RequestHandler => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const campaignSchema = z.object({ name: z.string().trim().min(2).max(80), description: z.string().max(500).default(''), status: z.enum(['draft','active','closed']).default('draft') });
 const stageSchema = z.object({ name: z.string().trim().min(2).max(50), description: z.string().max(300).default(''), kind: z.enum(['registration','checkin','submission']).default('checkin'), position: z.number().int().positive() });
+const stageOrderSchema = z.object({ stageIds: z.array(z.string().uuid()).min(1) });
 const participantSchema = z.object({ name: z.string().trim().min(2).max(40), studentId: z.string().trim().min(3).max(40), phone: z.string().trim().regex(/^1?\d{6,14}$/), school: z.string().trim().max(80).default(''), submissionUrl: z.string().trim().url('作品链接格式不正确').max(500).optional().or(z.literal('')) });
 
 app.post('/api/auth/login', asyncRoute(async (req, res) => {
@@ -69,6 +70,12 @@ app.get('/api/campaigns/:id/stages', requireAdmin, asyncRoute(async (req,res)=>{
 app.post('/api/campaigns/:id/stages', requireAdmin, asyncRoute(async (req,res)=>{ const b=stageSchema.parse(req.body); const r=await query('INSERT INTO stages(campaign_id,name,description,kind,position) VALUES($1,$2,$3,$4,$5) RETURNING *',[req.params.id,b.name,b.description,b.kind,b.position]); res.status(201).json(r.rows[0]); }));
 app.patch('/api/stages/:id', requireAdmin, asyncRoute(async (req,res)=>{ const b=stageSchema.partial().parse(req.body); const cur=await query<any>('SELECT * FROM stages WHERE id=$1 AND deleted_at IS NULL',[req.params.id]); if(!cur.rowCount)return void res.status(404).json({error:'阶段不存在'}); const v={...cur.rows[0],...b}; const r=await query('UPDATE stages SET name=$2,description=$3,kind=$4,position=$5 WHERE id=$1 RETURNING *',[req.params.id,v.name,v.description,v.kind,v.position]); res.json(r.rows[0]); }));
 app.delete('/api/stages/:id', requireAdmin, asyncRoute(async (req,res)=>{ await query('UPDATE stages SET deleted_at=now() WHERE id=$1',[req.params.id]); res.status(204).end(); }));
+app.put('/api/campaigns/:id/stages/order', requireAdmin, asyncRoute(async (req,res)=>{
+  const {stageIds}=stageOrderSchema.parse(req.body); const current=await query<any>('SELECT id FROM stages WHERE campaign_id=$1 AND deleted_at IS NULL ORDER BY position',[req.params.id]);
+  if(current.rowCount!==stageIds.length||current.rows.some(x=>!stageIds.includes(x.id)))return void res.status(400).json({error:'阶段排序数据不完整'});
+  const client=await pool.connect(); try{await client.query('BEGIN');await client.query('UPDATE stages SET position=position+1000 WHERE campaign_id=$1 AND deleted_at IS NULL',[req.params.id]);for(let i=0;i<stageIds.length;i++)await client.query('UPDATE stages SET position=$2 WHERE id=$1',[stageIds[i],i+1]);await client.query('COMMIT');}catch(e){await client.query('ROLLBACK');throw e}finally{client.release();}
+  res.status(204).end();
+}));
 
 app.get('/api/public/stages/:id', asyncRoute(async (req,res)=>{ const r=await query<any>('SELECT s.*,c.name campaign_name,c.status FROM stages s JOIN campaigns c ON c.id=s.campaign_id WHERE s.id=$1 AND s.deleted_at IS NULL',[req.params.id]); if(!r.rowCount)return void res.status(404).json({error:'签到入口不存在'}); res.json(r.rows[0]); }));
 app.post('/api/public/stages/:id/checkin', asyncRoute(async (req,res)=>{
@@ -83,7 +90,11 @@ app.post('/api/public/stages/:id/checkin', asyncRoute(async (req,res)=>{
 }));
 
 app.get('/api/campaigns/:id/analytics', requireAdmin, asyncRoute(async (req,res)=>{
-  const r=await query<any>(`SELECT s.id,s.name,s.position,count(DISTINCT c.participant_id)::int count FROM stages s LEFT JOIN checkins c ON c.stage_id=s.id WHERE s.campaign_id=$1 AND s.deleted_at IS NULL GROUP BY s.id ORDER BY s.position`,[req.params.id]);
+  const params:any[]=[req.params.id]; const conditions:string[]=[];
+  if(req.query.from){params.push(String(req.query.from));conditions.push(`c.created_at >= $${params.length}`)}
+  if(req.query.to){params.push(`${String(req.query.to)}T23:59:59.999Z`);conditions.push(`c.created_at <= $${params.length}`)}
+  const cFilter=conditions.length?` AND ${conditions.join(' AND ')}`:'';
+  const r=await query<any>(`SELECT s.id,s.name,s.position,count(DISTINCT c.participant_id)::int count FROM stages s LEFT JOIN checkins c ON c.stage_id=s.id${cFilter} WHERE s.campaign_id=$1 AND s.deleted_at IS NULL GROUP BY s.id ORDER BY s.position`,params);
   const funnel=buildFunnel(r.rows); res.json({funnel,overallRate:funnel.length?percentage(funnel.at(-1)!.count,funnel[0].count):0});
 }));
 app.get('/api/campaigns/:id/participants', requireAdmin, asyncRoute(async (req,res)=>{
