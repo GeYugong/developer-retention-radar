@@ -1,10 +1,10 @@
-# 华为云 ECS 部署指南
+# 华为云 Flexus / ECS 部署指南
 
 ## 1. 准备资源
 
-推荐使用 Ubuntu 24.04、2 核 4 GB 及以上 ECS。安全组至少放行 TCP 22、80；配置 HTTPS 后再放行 443。生产环境不要对公网开放 PostgreSQL 的 5432 端口。
+推荐使用 Ubuntu 22.04/24.04、2 核 4 GiB 及以上的华为云 Flexus 应用服务器 L 实例或 ECS。安全组至少放行 TCP 22、80；配置 HTTPS 后再放行 443。生产环境不要对公网开放 PostgreSQL 的 5432 端口。
 
-安装 Git、Docker Engine 与 Docker Compose 插件，然后克隆私有仓库。私有仓库可使用 GitHub Deploy Key 或短期访问令牌，不要把令牌写进命令脚本或 `.env`。
+安装 Git、Docker Engine 与 Docker Compose 插件，然后克隆仓库。AtomGit/GitCode 私有仓库可使用 SSH 公钥或短期访问令牌，GitHub 私有备份仓库可使用 Deploy Key；不要把令牌写进命令脚本、文档或 `.env`。
 
 ## 2. 配置环境
 
@@ -51,4 +51,3 @@ docker compose exec db pg_isready -U radar -d radar
 ```
 
 若二维码指向内网地址，检查 `.env` 的 `PUBLIC_URL` 与浏览器实际访问域名是否一致，并从公网地址进入后台后重新展示二维码。
-

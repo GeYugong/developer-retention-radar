@@ -18,7 +18,7 @@ npm run lint
 npm run build
 ```
 
-Confirm that the API tests cover authentication, duplicate check-in handling, and the `100 -> 80 -> 50` funnel calculation. Do not claim a deployment is working until `/api/health` returns `{"status":"ok"}` from the intended public URL.
+Confirm that the API tests cover authentication, duplicate check-in handling, and the `100 -> 80 -> 50 -> 35` four-stage funnel calculation. Do not claim a deployment is working until `/api/health` returns `{"status":"ok"}` from the intended public URL.
 
 ## Deploy and seed a demo
 
