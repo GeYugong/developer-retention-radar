@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { request } from './api';
 import type { Stage } from './types';
+import { ThemeToggle } from './ThemeToggle';
 
 export function CheckinPage({ stageId }: { stageId:string }) {
   const [stage,setStage]=useState<Stage>(); const [error,setError]=useState(''); const [busy,setBusy]=useState(false); const [done,setDone]=useState<{duplicate:boolean;name:string}>();
@@ -12,5 +13,5 @@ export function CheckinPage({ stageId }: { stageId:string }) {
   const isSubmission=stage.kind==='submission';
   return <Shell><div className="checkin-card"><div className="stage-meta"><span>阶段 {stage.position}</span><em>{stage.kind==='registration'?'报名建档':isSubmission?'作品提交':'任务签到'}</em></div><span className="eyebrow">{stage.campaign_name}</span><h1>{stage.name}</h1><p>{stage.description||'填写身份信息，完成本阶段签到。'}</p>{stage.status!=='active'&&<div className="alert">活动当前未开放，暂时不能签到。</div>}<form onSubmit={submit}><div className="form-section-title"><b>参与者信息</b><span>请填写真实信息用于进度匹配</span></div><label>姓名<input name="name" required minLength={2} placeholder="请输入真实姓名"/></label><label>学号<input name="studentId" required minLength={3} placeholder="用于匹配报名信息"/></label><label>手机号<input name="phone" required inputMode="numeric" pattern="1?\d{6,14}" placeholder="用于确认身份"/></label>{isSubmission&&<label>作品链接<input name="submissionUrl" type="url" required placeholder="https://… 作品、代码或演示链接"/></label>}<label>学校（选填）<input name="school" placeholder="所在学校"/></label>{error&&<div className="alert error">{error}</div>}<button disabled={busy||stage.status!=='active'}>{busy?'正在提交…':stage.kind==='registration'?'确认报名':isSubmission?'提交作品':'完成签到'}</button></form><small className="privacy-note">信息仅用于本次训练营进度统计，不会公开展示</small></div></Shell>;
 }
-function Shell({children}:{children:React.ReactNode}){return <main className="public-shell"><div className="public-glow glow-one"/><div className="public-glow glow-two"/><header><div className="public-brand"><i>R</i><div><b>开发者留存雷达</b><small>Developer Retention Radar</small></div></div><span>统一签到 · 实时进度</span></header>{children}<footer>由开发者留存雷达提供进度服务</footer></main>}
+function Shell({children}:{children:React.ReactNode}){return <main className="public-shell"><div className="public-glow glow-one"/><div className="public-glow glow-two"/><header><div className="public-brand"><i>R</i><div><b>开发者留存雷达</b><small>Developer Retention Radar</small></div></div><div className="public-actions"><span>统一签到 · 实时进度</span><ThemeToggle compact/></div></header>{children}<footer>由开发者留存雷达提供进度服务</footer></main>}
 function State({icon,title,text}:{icon:string;title:string;text:string}){return <div className="state-card"><i>{icon}</i><h1>{title}</h1><p>{text}</p></div>}
