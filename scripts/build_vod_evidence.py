@@ -7,7 +7,7 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "deliverables" / "开发者声音VOD建议材料.docx"
+OUT = ROOT / "VOD_Feedback_Evidence.docx"
 
 BLUE = RGBColor(46, 116, 181)
 NAVY = RGBColor(11, 37, 69)
@@ -57,6 +57,8 @@ for row, (label, value) in zip(table.rows, [
     ("关联产品", "华为云 Flexus 云服务 / Flexus 应用服务器 L 实例"),
     ("建议类型", "用户体验与功能优化建议"),
     ("项目名称", "开发者留存雷达（Developer Retention Radar）"),
+    ("参赛者", "葛禹贡 / 20243121880"),
+    ("指导教师", "马瑞新"),
     ("材料状态", "建议稿，随竞赛作品压缩包提交"),
 ]):
     set_width(row.cells[0], 2700); set_width(row.cells[1], 6660); shade(row.cells[0], "E8EEF5")
@@ -90,7 +92,6 @@ para("本建议来自真实竞赛项目部署过程。项目采用 React、Node.
 p = doc.add_paragraph(); p.paragraph_format.space_before = Pt(5)
 r = p.add_run("公网访问："); font(r, 11, NAVY, True); r = p.add_run("http://123.60.220.148"); font(r, 11, BLUE)
 
-OUT.parent.mkdir(exist_ok=True)
 doc.core_properties.title = "开发者声音VOD建议材料"
 doc.core_properties.author = "Developer Retention Radar"
 doc.save(OUT)
