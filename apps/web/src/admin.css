@@ -99,6 +99,7 @@
 .qr-card:hover{border-color:#b5c7ff;box-shadow:0 8px 22px rgba(0,82,217,.08);transform:translateY(-2px)}
 .qr-card svg:first-child{padding:7px;background:#fff;border:1px solid #eef0f2;border-radius:8px}
 .qr-card span{color:var(--td-brand);font-size:11px;font-weight:600}.qr-card h3{margin:5px 0;font-size:17px}.qr-card p{font-size:12px;color:var(--td-text-secondary);line-height:1.55}
+.qr-content{min-width:0;flex:1}.link-input{display:block;width:100%;margin:10px 0 9px;padding:8px 10px;border:1px solid var(--td-border);border-radius:6px;background:#f7f8fa;color:var(--td-text-secondary);font-size:11px;outline:none}.link-input:focus{border-color:var(--td-brand);background:#fff;box-shadow:0 0 0 2px rgba(0,82,217,.1)}.qr-actions{display:flex;align-items:center;gap:12px}.open-link{color:var(--td-brand);font-size:12px;font-weight:600;text-decoration:none}.open-link:hover{text-decoration:underline}
 
 .filters{display:flex;gap:10px;margin-bottom:16px;padding:12px;background:#f8f9fb;border-radius:8px}.filters input{flex:1}.filters select{width:180px}
 .table-wrap{overflow:auto;border:1px solid var(--td-border);border-radius:8px}table{width:100%;border-collapse:collapse;background:#fff}th,td{text-align:left;padding:13px 14px;border-bottom:1px solid #eef0f2;font-size:13px;white-space:nowrap}th{background:#f7f8fa;color:var(--td-text-secondary);font-weight:500}tbody tr:hover{background:#f8faff}tbody tr:last-child td{border-bottom:0}
