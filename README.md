@@ -4,6 +4,16 @@
 
 > 从创建活动到报名签到、后台分析和部署维护的全部操作，请查看根目录的 [《完整使用手册》](完整使用手册.md)。比赛答辩操作顺序请查看 [《答辩演示指南》](docs/DEMO.md)。
 
+## 在线体验与项目地址
+
+- 华为云公网地址：[http://123.60.220.148](http://123.60.220.148)
+- 管理后台：[http://123.60.220.148/admin](http://123.60.220.148/admin)
+- AtomGit（GitCode）仓库：[https://atomgit.com/GeYugong/developer-retention-radar](https://atomgit.com/GeYugong/developer-retention-radar)
+- 管理员用户名：`admin`
+- 管理员演示密码：`Radar-c465837015ea6dcf2c38`
+
+学生端无需登录。管理员登录后可在“签到入口”中打开或复制各阶段链接，也可展示二维码供手机扫码体验。
+
 ## 功能
 
 - 动态训练营与任务阶段管理，内置报名、账号开通、首次任务、最终提交模板
